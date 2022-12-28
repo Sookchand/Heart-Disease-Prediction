@@ -19,6 +19,7 @@ Given clinical parameters about the patient, we can predict whether they have he
 
 ## Demo
 
+![image](https://user-images.githubusercontent.com/34344439/209852759-9274aa67-0491-4771-a72f-a58e71496ac1.png)
 
 ![image](https://user-images.githubusercontent.com/34344439/209852536-c0286580-1a23-4ae2-b22c-4f5ba333928e.png)
 
