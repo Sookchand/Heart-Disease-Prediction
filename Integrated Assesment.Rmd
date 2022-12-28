@@ -1,0 +1,477 @@
+---
+title: "Integrated Assesment"
+author: "S.Harripersad"
+date: "09/02/2022"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+### Evaluation
+If we can reach 95% accuracy at predicting whether or not a patient has heart disease during the proof of concept, we'll pursue the project.
+
+# Predicting Heart disease using machine learning
+
+This notebook looks into using various Python-based machine-learning and data science libraries in attempt to build a machine learning model capable of predicting whether or not someone has heart disease based on their medical attribute.
+
+I am going to take the following approach:
+1. Problem Definition.
+2. Data.
+3. Evaluation.
+4. Features.
+5. Modelling.
+6. Experimentation
+
+## Problem Definition
+ 
+In a statement:
+Given clinical parameters about a patient, can we predict whether our not they have heart disease. 
+
+## Data
+
+This heart disease dataset is curated by combining 5 popular heart disease datasets already available independently but not combined before. In this dataset, 5 heart datasets are combined over 11 common features which makes it the largest heart disease dataset available so far for research purposes. The five datasets used for its curation are:
+
+*  Cleveland
+*  Hungarian
+*  Switzerland
+*  Long Beach VA
+*  Statlog (Heart) Data Set.
+
+The original data came from: https://ieee-dataport.org/open-access/heart-disease-dataset-comprehensive
+
+### Data Description - Features
+##Create Data Dictionary
+
+1.  age - Age, age in years(data type - numeric)
+2.  sex - Sex(data type - binary):
+    *   1 = male; 
+    *   0 = female. 
+3.  chest pain type - chest pain type(data type - nominal):
+    *  Value: 1- Typical angina: chest pain related decrease blood supply to the heart;
+    *  Value: 2 - Atypical angina: chest pain not related to heart;
+    *  Value: 3 - Non-anginal pain: typically esophageal spasms (non heart related);
+    *  Value: 4 - Asymptomatic: chest pain not showing signs of disease.
+4.  resting blood pressure - resting bp s(in mm Hg on admission to the hospital), (data type numeric):
+    *  anything above 130-140 is typically cause for concern.
+5.  serum cholesterol - Cholesterol in mg/dl(data type numeric):
+    *  serum = LDL + HDL + .2 * triglycerides;
+    *  above 200 is cause for concern;
+6.  fasting blood sugar - fasting blood sugar(1,0 > 120 mg/dl), (data type - binary): 
+    *   1 = true; 
+    *   0 = false; 
+    *  '>126' mg/dL signals diabetes.
+7.  resting electrocardiogram results -restecg results(data type - nominal):
+    *   Value: 1 - Nothing to note;
+    *   Value: 2 - ST-T Wave abnormality:
+      *   can range from mild symptoms to severe problems;
+      *   signals non-normal heart beat.
+    *   Value: 3 - Possible or definite left ventricular hypertrophy:
+      *   Enlarged heart's main pumping chamber.
+8.  maximum heart rate achieved - max heart rate(71 - 202), (data type - numeric)
+9.  exercise induced angina - exercise angina(data type binary):
+    *   1 = yes; 
+    *   0 = no.
+10. oldpeak =ST - oldpeak(depression induced by exercise relative to rest), (data type - numeric):
+    *   looks at stress of heart during exercise;
+    *   unhealthy heart will stress more.
+11. the slope of the peak exercise ST segment - ST slope(data type - nominal):
+      *  Value: 1 - Up sloping: better heart rate with exercise (uncommon);
+      *  Value: 2 - Flat sloping: minimal change (typical healthy heart);
+      *  Value: 3 - Down sloping: signs of unhealthy heart.
+12. target - have disease or not (1=yes, 0=no) (= the predicted attribute) (data type - binary)
+
+Note: No personal identifiable information (PPI) can be found in the data set.
+
+```{r}
+# install the caret, rpart and ROCR packages from CRAN
+if(require(caret) == FALSE){
+  install.packages('caret', dependencies = TRUE)
+  library(caret)
+}
+if(require(rpart) == FALSE){
+  install.packages('rpart')
+  library(rpart)
+}
+if(require(ROCR) == FALSE){
+  install.packages('ROCR')
+  library(ROCR)
+}
+
+# for a full list of models available in the caret packages:
+#   http://topepo.github.io/caret/available-models.html
+# for each model the list of tunable parameters is available
+#   from the caret command modelLookup
+```
+
+
+# Loading package
+```{r}
+library(dplyr) #A Grammar of Data Manipulation
+library(tibble) #modern take on data frames.
+library(dlookr) #Tools for Data Diagnosis, Exploration, Transformation (main library)
+library(tidyverse)
+library(flextable)
+library(Hmisc)
+library(prettydoc)
+library(corrr)
+library(parsnip)
+library(broom)
+library(yardstick)
+library(caret)
+library(datarium)
+library(ROCR)
+library(forecast)
+library(rms)
+library(janitor)
+library(vtree)
+```
+
+#### 2. Data exploration and preparation{#Data_exploration} 
+```{r}
+# read the data from a .csv file
+heart <- read.csv("heart_statlog_cleveland_hungary_final.csv",na.strings = c("NA", ""))
+```
+
+```{r}
+dim(heart)
+```
+
+
+```{r}
+# inspect the data 
+diagnose(heart) %>% flextable()
+```
+From the table above I can see that the Variables matches the data type as given in the data dictionary above.  For example age which is a variable matches with its' type which is an integer(numeric) and this is true for all variables and types. There are no missing values.  There is a potential problem  of having duplicate since this data set is a merger of four different heart disease data set.  There is also a need to check for ouliers.  
+
+
+# Numeric value analysis
+
+```{r}
+diagnose_numeric(heart) %>% flextable()
+```
+
+Plotting for each feature.  
+```{r}
+plot_outlier(heart)
+```
+
+Upon analysis of this table I can see several problem:
+1.  Variables with outliers include:
+  *   sex;
+  *   chest.pain.type
+  *   resting.bp.s
+  *   cholesterol
+  *   fasting.blood.sugar;
+  *   max heart.rate;
+  *   ST.slop
+  
+2.  Missing values:
+  *   cholesterol = 0.  This data is numeric and no one alive has a cholesterol reading 0 mg/dl.  It means that this most likely was missing data that was given a value of 0.
+
+Lets us plot the outliers
+
+#Graphical Analysis
+
+```{r}
+# generate a histogram for each variable (and show them on the same page)
+#   note: titles and x labels are set to the name of the relevant variable
+opar <- par(no.readonly = TRUE)
+par(mfrow = c(2,3))
+hist(heart[, 1], main = names(heart)[1], xlab = names(heart)[1], xlim = c(0,100))
+hist(heart[, 2], main = names(heart)[2], xlab = names(heart)[2], xlim = c(0,100))
+hist(heart[, 3], main = names(heart)[3], xlab = names(heart)[3], xlim = c(0,100))
+hist(heart[, 4], main = names(heart)[4], xlab = names(heart)[4], xlim = c(0,100))
+hist(heart[, 5], main = names(heart)[5], xlab = names(heart)[5], xlim = c(0,100))
+hist(heart[, 6], main = names(heart)[6], xlab = names(heart)[6], xlim = c(0,100))
+hist(heart[, 7], main = names(heart)[7], xlab = names(heart)[7], xlim = c(0,100))
+hist(heart[, 8], main = names(heart)[8], xlab = names(heart)[8], xlim = c(0,100))
+hist(heart[, 9], main = names(heart)[9], xlab = names(heart)[9], xlim = c(0,100))
+hist(heart[, 10], main = names(heart)[10], xlab = names(heart)[10], xlim = c(0,100))
+hist(heart[, 11], main = names(heart)[11], xlab = names(heart)[11], xlim = c(0,100))
+hist(heart[, 12], main = names(heart)[12], xlab = names(heart)[12], xlim = c(0,100))
+par(opar)
+
+# generate a density plot for each variable (and show them on the same page)
+#   note: kernel density estimation may have tails outside the variable range!
+opar <- par(no.readonly = TRUE)
+par(mfrow = c(2,3))
+plot(density(heart[, 1]), main = names(heart)[1], xlab = names(heart)[1])
+plot(density(heart[, 2]), main = names(heart)[2], xlab = names(heart)[2])
+plot(density(heart[, 3]), main = names(heart)[3], xlab = names(heart)[3])
+plot(density(heart[, 4]), main = names(heart)[4], xlab = names(heart)[4])
+plot(density(heart[, 5]), main = names(heart)[5], xlab = names(heart)[5])
+plot(density(heart[, 6]), main = names(heart)[6], xlab = names(heart)[6])
+plot(density(heart[, 7]), main = names(heart)[7], xlab = names(heart)[7])
+plot(density(heart[, 8]), main = names(heart)[8], xlab = names(heart)[8])
+plot(density(heart[, 9]), main = names(heart)[9], xlab = names(heart)[9])
+plot(density(heart[, 10]), main = names(heart)[10], xlab = names(heart)[10])
+plot(density(heart[, 11]), main = names(heart)[11], xlab = names(heart)[11])
+plot(density(heart[, 12]), main = names(heart)[12], xlab = names(heart)[12])
+par(opar)
+
+# generate a boxplot graph including horizontal background dashed lines
+#   note: this can be done by
+#     1. plotting an empty graph, i.e. with white boxes
+#     2. adding the background dashed lines
+#     3. plotting the coloured boxplot with the option add = T
+opar <- par(no.readonly = TRUE)
+boxplot(
+  swiss,
+  border = 'white',
+  yaxt = 'n'
+)
+abline(h = seq(0,100,10), lty = 'dashed', lwd = 2, col = 'darkgrey')
+boxplot(
+  swiss,
+  border = 'blue',
+  yaxt = 'n',
+  add = T
+)
+axis(2, seq(0,100,10))
+par(opar)
+```
+
+
+Age - positive skewness, Kurtosis none 
+Sex - negative skewness
+Chest.pain.type - negative skewness
+Resting.bp.s - negative skewness
+Cholesterol - negative skewness
+Fasting.blood - positive skewness
+resting.ecg - positive skewness
+max.heart.rate - positive skewness
+exercise.agina - positive skewness
+oldpeak - negative skewness
+ST.slope - negative skewness
+target - negative skewness
+
+The plots confirms that the ouliers do exist in the seven features mentioend above.
+
+
+
+```{r}
+hist(heart$target)
+```
+Those suffering from heart disease is greater in numbers versus those that is not.  I wonder will a gender analysis show.  Looking at it below.  For men there is a greater percentage of men having the disease than women.  
+
+```{r}
+tabyl(heart, sex, target)
+```
+# Detecting missing/incorect data as identified in the variable cholesterol and identification of outliers.
+After cleaning the data 
+
+```{r}
+#  Identifying which values == 0 in this column
+#  heart$cholesterol == 0 will give all values = 0 as True and the rest as false.
+#  Passing the above result to the column and replacing with NA
+heart$cholesterol[heart$cholesterol == 0] <- NA
+# Removing all instance of NA
+heart_clean <- na.omit(heart)
+# Check the size
+dim(heart)
+dim(heart_clean)
+```
+
+
+```{r}
+boxplot(target ~ age, data = heart)
+boxplot(target ~ sex, data = heart)
+boxplot(target ~ chest.pain.type, data = heart)
+boxplot(target ~ resting.bp.s, data = heart)
+boxplot(target ~ cholesterol, data = heart)
+boxplot(target ~ fasting.blood.sugar, data = heart)
+boxplot(target ~ resting.ecg, data = heart)
+boxplot(target ~ max.heart.rate, data = heart)
+boxplot(target ~ exercise.angina, data = heart)
+boxplot(target ~ oldpeak, data = heart)
+boxplot(target ~ ST.slope, data = heart)
+```
+Boxplot analysis has confirm what numeric analysis table showed us and that is we have 7 variables with outliers.
+ Variables with outliers include:
+  *   sex;
+  *   chest.pain.type
+  *   resting.bp.s
+  *   cholesterol
+  *   fasting.blood.sugar;
+  *   max heart.rate;
+  *   ST.slop
+  
+I have chosen to remove outliers as identified by the boxplot analysis.
+
+```{r}
+# outliers was detected above using boxplot
+#   note: the boxplot command returns a summary statistics object
+#     this object can be assigned to a variable and inspected
+heart_sex_boxplot <-boxplot(target ~ sex, data = heart)
+heart_cpt_boxplot <-boxplot(target ~ chest.pain.type, data = heart)
+heart_rbps_boxplot <-boxplot(target ~ resting.bp.s, data = heart)
+heart_chol_boxplot <-boxplot(target ~ cholesterol, data = heart)
+heart_fbs_boxplot <-boxplot(target ~ fasting.blood.sugar, data = heart)
+heart_mhr_boxplot <-boxplot(target ~ max.heart.rate, data = heart)
+heart_STs_boxplot <-boxplot(target ~ ST.slope, data = heart)
+# inspect the boxplot statistics
+#   note: the returened value is a list object
+heart_sex_boxplot 
+heart_cpt_boxplot 
+heart_rbps_boxplot
+heart_chol_boxplot
+heart_fbs_boxplot 
+heart_mhr_boxplot 
+heart_STs_boxplot 
+# outlier values can be extracted from this object
+#   they are stored in the element 'out' of the list
+heart_sex_boxplot$out 
+heart_cpt_boxplot$out
+heart_rbps_boxplot$out
+heart_chol_boxplot$out
+heart_fbs_boxplot$out
+heart_mhr_boxplot$out
+heart_STs_boxplot$out
+
+# get the minimum value that is an outlier
+min(heart_sex_boxplot$out) 
+min(heart_cpt_boxplot$out)
+min(heart_rbps_boxplot$out)
+min(heart_chol_boxplot$out)
+min(heart_fbs_boxplot$out)
+min(heart_mhr_boxplot$out)
+min(heart_STs_boxplot$out)
+
+# outliers rows can be extracted by conditional selection
+heart_clean[heart_clean$sex >= min(heart_sex_boxplot$out), ]
+heart_clean[heart_clean$chest.pain.type >= min(heart_cpt_boxplot$out), ]
+heart_clean[heart_clean$resting.bp.s >= min(heart_rbps_boxplot$out), ]
+heart_clean[heart_clean$cholesterol >= min(heart_chol_boxplot$out), ]
+heart_clean[heart_clean$fasting.blood.sugar >= min(heart_fbs_boxplot$out), ]
+heart_clean[heart_clean$max.heart.rate >= min(heart_mhr_boxplot$out), ]
+heart_clean[heart_clean$ST.slope >= min(heart_STs_boxplot$out), ]
+
+```
+
+```{r}
+dim(heart)
+dim(heart_clean)
+```
+
+```{r}
+colnames(heart_clean)
+```
+I am going to finish this project in Google colab and the column names would be a problem "the name separated by ".".  I am going to rename the ones that is problematic.  
+
+```{r}
+colnames(heart_clean)[colnames(heart_clean) ==  "chest.pain.type" ] <- "chest_pain_type"
+colnames(heart_clean)[colnames(heart_clean) == "resting.bp.s" ] <- "resting_bp_s"
+colnames(heart_clean)[colnames(heart_clean) ==  "fasting.blood.sugar" ] <- "fasting_blood_sugar"
+colnames(heart_clean)[colnames(heart_clean) ==  "resting.ecg" ] <- "resting_ecg"
+colnames(heart_clean)[colnames(heart_clean) ==  "max.heart.rate" ] <- "max_heart_rate"
+colnames(heart_clean)[colnames(heart_clean) ==  "exercise.angina" ] <- "exercise_angina" 
+colnames(heart_clean)[colnames(heart_clean) ==  "ST.slope" ] <- "ST_slope"
+```
+
+```{r}
+colnames(heart_clean)
+```
+
+```{r}
+# perform PCA on the swiss dataset
+#   note: variables are centered and scaled before analysis
+pc_heart <- prcomp(heart_clean, center = T, scale. = T)
+
+# inspect the attributes of the PCA object returned by prcomp
+attributes(pc_heart)
+# see value section of the help for the prcomp for more details
+help(prcomp)
+```
+
+```{r}
+# calculate the proportion of exaplained variance (PEV) from the std values
+pc_heart_var <- pc_heart$sdev^2
+pc_heart_var
+pc_heart_PEV <- pc_heart_var / sum(pc_heart_var)
+pc_heart_PEV
+
+# plot the variance per PC
+#   note: this can be done using the plot function on the prcomp object
+plot(pc_heart)
+
+# plot the cumulative value of PEV for increasing number of additional PCs
+#   note: add an 80% threshold line to inform the feature extraction
+#     according to the plot the first 3 PCs should be selected
+opar <- par(no.readonly = TRUE)
+plot(
+  cumsum(pc_heart_PEV),
+  ylim = c(0,1),
+  xlab = 'PC',
+  ylab = 'cumulative PEV',
+  pch = 20,
+  col = 'orange'
+)
+abline(h = 0.8, col = 'red', lty = 'dashed')
+par(opar)
+
+# get and inspect the loadings for each PC
+#   note: loadings are reported as a rotation matrix (see lecture)
+pc_heart_loadings <- pc_heart$rotation
+pc_heart_loadings
+
+# plot the loadings for the first three PCs as a barplot
+#   note: two vectors for colours and labels are created for convenience
+#     for details on the other parameters see the help for barplot and legend
+opar <- par(no.readonly = TRUE)
+colvector = c('red', 'orange', 'yellow', 'green', 'cyan', 'blue')
+labvector = c('PC1', 'PC2', 'PC3')
+barplot(
+  pc_heart_loadings[,c(1:3)],
+  beside = T,
+  yaxt = 'n',
+  names.arg = labvector,
+  col = colvector,
+  ylim = c(-1,1),
+  border = 'white',
+  ylab = 'loadings'
+)
+axis(2, seq(-1,1,0.1))
+legend(
+  'bottomright',
+  bty = 'n',
+  col = colvector,
+  pch = 15,
+  row.names(pc_heart_loadings)
+)
+par(opar)
+
+# generate a biplot for each pair of important PCs (and show them on the same page)
+#   note: the option choices is used to select the PCs - default is 1:2
+opar <- par(no.readonly = TRUE)
+par(mfrow = c(2,2))
+biplot(
+  pc_heart,
+  scale = TRUE,
+  col = c('grey40','orange')
+)
+biplot(
+  pc_heart,
+  choices = c(1,3),
+  scale = TRUE,
+  col = c('grey40','orange')
+)
+biplot(
+  pc_heart,
+  choices = c(2,3),
+  scale = TRUE,
+  col = c('grey40','orange')
+)
+par(opar)
+```
+
+
+# Saving clean data to csv
+```{r}
+write.csv(heart_clean, "Clean_heart_data.csv")
+```
