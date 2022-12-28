@@ -20,6 +20,8 @@ Given clinical parameters about the patient, we can predict whether they have he
 ## Demo
 
 https://github.com/Sookchand/Heart-Disease-Prediction/blob/main/Performance%20Evaluation.png
+![image](https://user-images.githubusercontent.com/34344439/209852536-c0286580-1a23-4ae2-b22c-4f5ba333928e.png)
+
 
 
 ## Documentation
